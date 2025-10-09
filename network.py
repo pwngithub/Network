@@ -4,8 +4,9 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
+import time   # 👈 added
 
-# Disable SSL warnings for self-signed certs (safe for internal use)
+# Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -39,9 +40,11 @@ graphid = period_to_graphid[graph_period]
 # --- Auto-refresh toggle ---
 enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
 
-# Only refresh when toggle ON and period is Live (2 hours)
+# --- Simple refresh loop (safe on Streamlit Cloud) ---
 if enable_refresh and graph_period == "Live (2 hours)":
-    st.autorefresh(interval=60 * 1000, key="auto_refresh")
+    # Wait 60 s, then rerun the script
+    time.sleep(60)
+    st.experimental_rerun()
 
 # --- Sensors ---
 SENSORS = {
@@ -92,7 +95,6 @@ def show_graph(sensor_name, sensor_id):
     in_avg = stats.get("Traffic In_avg", 0)
     out_avg = stats.get("Traffic Out_avg", 0)
 
-    # Display text stats
     st.markdown(
         f"**Peak In:** {in_peak} Mbps  **Peak Out:** {out_peak} Mbps  \n"
         f"**Avg In:** {in_avg} Mbps  **Avg Out:** {out_avg} Mbps"
@@ -116,7 +118,6 @@ def show_graph(sensor_name, sensor_id):
     except requests.exceptions.RequestException as e:
         st.error(f"Network error for {sensor_name}")
         st.code(str(e))
-
     return in_peak, out_peak
 
 
@@ -134,7 +135,7 @@ for i in range(0, len(sensor_items), 2):
             total_in += in_peak
             total_out += out_peak
 
-# --- Summary Chart for Total Bandwidth ---
+# --- Summary Chart ---
 st.markdown("---")
 st.header("📈 Total Bandwidth Summary (All Sensors Combined)")
 
@@ -143,7 +144,8 @@ st.markdown(
 )
 
 fig, ax = plt.subplots(figsize=(6, 4))
-ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out], color=["tab:blue", "tab:orange"])
+ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out],
+       color=["tab:blue", "tab:orange"])
 ax.set_ylabel("Mbps")
 ax.set_title("Aggregate Peak Bandwidth (Current)")
 ax.grid(axis="y", linestyle="--", alpha=0.6)
