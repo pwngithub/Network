@@ -4,7 +4,6 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
-import time   # 👈 added
 
 # Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -36,15 +35,6 @@ period_to_graphid = {
     "Last 365 days": "3",
 }
 graphid = period_to_graphid[graph_period]
-
-# --- Auto-refresh toggle ---
-enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
-
-# --- Simple refresh loop (safe on Streamlit Cloud) ---
-if enable_refresh and graph_period == "Live (2 hours)":
-    # Wait 60 s, then rerun the script
-    time.sleep(60)
-    st.experimental_rerun()
 
 # --- Sensors ---
 SENSORS = {
@@ -135,7 +125,7 @@ for i in range(0, len(sensor_items), 2):
             total_in += in_peak
             total_out += out_peak
 
-# --- Summary Chart ---
+# --- Summary Chart for Total Bandwidth ---
 st.markdown("---")
 st.header("📈 Total Bandwidth Summary (All Sensors Combined)")
 
