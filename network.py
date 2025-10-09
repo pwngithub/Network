@@ -36,12 +36,12 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Sensors (Renamed Houlton → Firstlight, Presque Isle → NNINIX) ---
+# --- Sensors (Renamed all four) ---
 SENSORS = {
     "Firstlight (ID 12435)": "12435",
     "NNINIX (ID 12506)": "12506",
-    "Fiber Aggregation Switch (ID 12363)": "12363",
-    "DWDM Node - Calais (ID 12340)": "12340",
+    "HE (ID 12363)": "12363",
+    "Cogent (ID 12340)": "12340",
 }
 
 # --- Fetch Peak/Average Stats ---
