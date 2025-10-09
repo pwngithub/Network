@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 
+# Disable SSL warnings for self-signed certs (safe for internal use)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -42,38 +43,59 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Function to fetch peak bandwidth from PRTG API ---
-def fetch_peak_bandwidth(sensor_id):
+# --- Function to fetch bandwidth stats (peak + average) ---
+def fetch_bandwidth_stats(sensor_id):
     try:
         url = (
             f"{PRTG_URL}/api/table.json?"
-            f"content=channels&columns=name,lastvalue_,lastvalue_raw,maximum,maximum_raw"
+            f"content=channels&columns=name,lastvalue_,lastvalue_raw,average,average_raw,maximum,maximum_raw"
             f"&id={sensor_id}"
             f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
         )
         response = requests.get(url, verify=False, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            peaks = {}
+            stats = {}
             for ch in data.get("channels", []):
                 name = ch.get("name", "")
                 max_val = ch.get("maximum_raw")
-                if max_val is not None:
-                    # Convert from bits per second to Mbps
-                    peaks[name] = round(float(max_val) / 1_000_000, 2)
-            return peaks
+                avg_val = ch.get("average_raw")
+
+                # Safely handle missing or empty values
+                if max_val not in (None, "", " "):
+                    try:
+                        stats[f"{name}_max"] = round(float(max_val) / 1_000_000, 2)
+                    except ValueError:
+                        pass
+                if avg_val not in (None, "", " "):
+                    try:
+                        stats[f"{name}_avg"] = round(float(avg_val) / 1_000_000, 2)
+                    except ValueError:
+                        pass
+            return stats
+        else:
+            st.warning(f"Failed to fetch channel data (HTTP {response.status_code}) for sensor {sensor_id}")
     except Exception as e:
-        st.warning(f"Error fetching peak bandwidth: {e}")
+        st.warning(f"Error fetching bandwidth data for sensor {sensor_id}: {e}")
     return {}
 
 # --- Function to fetch and display graph ---
 def show_graph(sensor_name, sensor_id):
-    peaks = fetch_peak_bandwidth(sensor_id)
-    if peaks:
-        in_bw = peaks.get("Traffic In", 0)
-        out_bw = peaks.get("Traffic Out", 0)
-        st.markdown(f"**Peak In:** {in_bw} Mbps  **Peak Out:** {out_bw} Mbps")
+    stats = fetch_bandwidth_stats(sensor_id)
 
+    # Extract traffic values
+    in_peak = stats.get("Traffic In_max", 0)
+    out_peak = stats.get("Traffic Out_max", 0)
+    in_avg = stats.get("Traffic In_avg", 0)
+    out_avg = stats.get("Traffic Out_avg", 0)
+
+    # Display stats
+    st.markdown(
+        f"**Peak In:** {in_peak} Mbps  **Peak Out:** {out_peak} Mbps  \n"
+        f"**Avg In:** {in_avg} Mbps  **Avg Out:** {out_avg} Mbps"
+    )
+
+    # Build graph URL
     graph_url = (
         f"{PRTG_URL}/chart.png"
         f"?id={sensor_id}&graphid={graphid}"
@@ -94,7 +116,7 @@ def show_graph(sensor_name, sensor_id):
         st.error(f"Network error for {sensor_name}")
         st.code(str(e))
 
-# --- Layout (2x2 grid) ---
+# --- Layout (2×2 grid) ---
 sensor_items = list(SENSORS.items())
 for i in range(0, len(sensor_items), 2):
     cols = st.columns(2)
