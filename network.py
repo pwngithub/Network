@@ -5,7 +5,7 @@ from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
 
-# Disable SSL warnings for self-signed certs (safe for internal use)
+# Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -22,6 +22,26 @@ except KeyError:
     st.stop()
 
 st.title("📊 PRTG Bandwidth Overview")
+
+# --- Auto-refresh toggle ---
+enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds", value=False)
+if enable_refresh:
+    st.experimental_rerun  # placeholder to avoid linter
+    st_autorefresh = st.experimental_rerun  # placeholder, not used directly
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh = st.experimental_rerun
+    st_autorefresh = st.experimental_rerun
+else:
+    pass
+
+# Use Streamlit's built-in auto-refresh (works every interval in ms)
+if enable_refresh:
+    st_autorefresh = st.experimental_rerun
+    st.experimental_rerun
+st_autorefresh = st.autorefresh(interval=60 * 1000) if enable_refresh else None
 
 # --- Sensors ---
 SENSORS = {
@@ -61,7 +81,6 @@ def fetch_bandwidth_stats(sensor_id):
                 name = ch.get("name", "")
                 max_val = ch.get("maximum_raw")
                 avg_val = ch.get("average_raw")
-
                 if max_val not in (None, "", " "):
                     try:
                         stats[f"{name}_max"] = round(float(max_val) / 1_000_000, 2)
@@ -91,7 +110,6 @@ def show_graph(sensor_name, sensor_id):
         f"**Avg In:** {in_avg} Mbps  **Avg Out:** {out_avg} Mbps"
     )
 
-    # Build graph URL
     graph_url = (
         f"{PRTG_URL}/chart.png"
         f"?id={sensor_id}&graphid={graphid}"
