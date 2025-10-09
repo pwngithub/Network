@@ -36,7 +36,7 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Sensors (Renamed all four) ---
+# --- Sensors (Renamed) ---
 SENSORS = {
     "Firstlight (ID 12435)": "12435",
     "NNINIX (ID 12506)": "12506",
@@ -93,7 +93,7 @@ def show_graph(sensor_name, sensor_id):
     graph_url = (
         f"{PRTG_URL}/chart.png"
         f"?id={sensor_id}&graphid={graphid}"
-        f"&width=1200&height=500"
+        f"&width=1600&height=700"  # ⬅️ Larger, higher-resolution graphs
         f"&avg=0&graphstyling=base"
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
@@ -102,7 +102,8 @@ def show_graph(sensor_name, sensor_id):
         response = requests.get(graph_url, verify=False, timeout=10)
         if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
             img = Image.open(BytesIO(response.content))
-            st.image(img, caption=f"{sensor_name}", use_container_width=False)
+            st.image(img, caption=f"{sensor_name}", use_container_width=True)  # ⬅️ Fill width
+            st.markdown("<hr style='border:1px solid #ccc; margin:20px 0;'>", unsafe_allow_html=True)
         else:
             st.warning(f"⚠️ Could not load graph for {sensor_name}.")
     except requests.exceptions.RequestException as e:
@@ -133,7 +134,7 @@ st.markdown(
     f"**Total Peak In:** {total_in:.2f} Mbps  **Total Peak Out:** {total_out:.2f} Mbps"
 )
 
-fig, ax = plt.subplots(figsize=(6, 4))
+fig, ax = plt.subplots(figsize=(7, 4))
 ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out],
        color=["tab:blue", "tab:orange"])
 ax.set_ylabel("Mbps")
