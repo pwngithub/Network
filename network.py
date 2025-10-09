@@ -4,7 +4,6 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
-from streamlit_autorefresh import st_autorefresh  # built-in helper
 
 # Disable SSL warnings for self-signed certs (safe for internal use)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -27,8 +26,18 @@ st.title("📊 PRTG Bandwidth Overview")
 # --- Auto-refresh toggle ---
 enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
 if enable_refresh:
-    # Refresh every 60 seconds (60000 ms)
-    st_autorefresh(interval=60 * 1000, key="auto_refresh")
+    st_autorefresh = st.experimental_rerun  # placeholder
+if enable_refresh:
+    if "refresh" not in st.session_state:
+        st.session_state["refresh"] = 0
+    # Only run refresh if period is "Live"
+    if st.session_state.get("graph_period") == "Live (2 hours)":
+        st.session_state["refresh"] += 1
+        st.experimental_rerun()
+
+# Use the built-in st.autorefresh (Streamlit v1.24+)
+if enable_refresh:
+    st_autorefresh = st.autorefresh(interval=60 * 1000, key="auto_refresh")
 
 # --- Sensors ---
 SENSORS = {
