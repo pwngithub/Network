@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 # --- Configuration ---
 # Replace these with your actual PRTG server details
 PRTG_SERVER_URL = "https://prtg.pioneerbroadband.net" # e.g., "https://prtg.mycompany.com"
-PRTG_USERNAME = "streamlit_api_userUser"
+PRTG_USERNAME = "streamlit"
 PRTG_PASSHASH = "N4RWTIZ3WXZTKIJDO5L4QFQ5SJKECLJMTYCZW7HGHE======" # Get this from your user account settings in PRTG
 # --- Build the API Request URL ---
 # We are asking for a table of all sensors and requesting the 'sensor' column
