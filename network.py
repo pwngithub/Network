@@ -36,9 +36,9 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Sensors ---
+# --- Sensors (Renamed Houlton -> Firstlight) ---
 SENSORS = {
-    "Core Router - Houlton (ID 12435)": "12435",
+    "Firstlight (ID 12435)": "12435",
     "Core Router - Presque Isle (ID 12506)": "12506",
     "Fiber Aggregation Switch (ID 12363)": "12363",
     "DWDM Node - Calais (ID 12340)": "12340",
