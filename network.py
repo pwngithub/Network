@@ -5,7 +5,7 @@ from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
 
-# Disable SSL warnings for self-signed certs (safe internally)
+# Disable SSL warnings for self-signed certs (safe for internal use)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -23,9 +23,6 @@ except KeyError:
 
 st.title("📊 PRTG Bandwidth Overview")
 
-# --- Auto-refresh toggle ---
-enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
-
 # --- Graph Period ---
 graph_period = st.selectbox(
     "Select Graph Period",
@@ -39,10 +36,12 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Auto-refresh logic ---
+# --- Auto-refresh toggle ---
+enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
+
+# Only refresh when toggle ON and period is Live (2 hours)
 if enable_refresh and graph_period == "Live (2 hours)":
-    st_autorefresh = st.experimental_rerun  # avoid linter warnings
-    st_autorefresh = st.autorefresh(interval=60 * 1000, key="auto_refresh")
+    st.autorefresh(interval=60 * 1000, key="auto_refresh")
 
 # --- Sensors ---
 SENSORS = {
