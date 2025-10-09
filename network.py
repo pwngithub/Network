@@ -3,8 +3,9 @@ import requests
 from PIL import Image
 from io import BytesIO
 import urllib3
+import matplotlib.pyplot as plt
 
-# Disable SSL warnings for self-signed certs (safe for internal use)
+# Disable SSL warnings for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -43,12 +44,12 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Function to fetch bandwidth stats (peak + average) ---
+# --- Fetch Peak/Average Stats ---
 def fetch_bandwidth_stats(sensor_id):
     try:
         url = (
             f"{PRTG_URL}/api/table.json?"
-            f"content=channels&columns=name,lastvalue_,lastvalue_raw,average,average_raw,maximum,maximum_raw"
+            f"content=channels&columns=name,maximum_raw,average_raw"
             f"&id={sensor_id}"
             f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
         )
@@ -61,7 +62,6 @@ def fetch_bandwidth_stats(sensor_id):
                 max_val = ch.get("maximum_raw")
                 avg_val = ch.get("average_raw")
 
-                # Safely handle missing or empty values
                 if max_val not in (None, "", " "):
                     try:
                         stats[f"{name}_max"] = round(float(max_val) / 1_000_000, 2)
@@ -79,17 +79,15 @@ def fetch_bandwidth_stats(sensor_id):
         st.warning(f"Error fetching bandwidth data for sensor {sensor_id}: {e}")
     return {}
 
-# --- Function to fetch and display graph ---
+# --- Fetch and Display Graph ---
 def show_graph(sensor_name, sensor_id):
     stats = fetch_bandwidth_stats(sensor_id)
-
-    # Extract traffic values
     in_peak = stats.get("Traffic In_max", 0)
     out_peak = stats.get("Traffic Out_max", 0)
     in_avg = stats.get("Traffic In_avg", 0)
     out_avg = stats.get("Traffic Out_avg", 0)
 
-    # Display stats
+    # Display text stats
     st.markdown(
         f"**Peak In:** {in_peak} Mbps  **Peak Out:** {out_peak} Mbps  \n"
         f"**Avg In:** {in_avg} Mbps  **Avg Out:** {out_avg} Mbps"
@@ -116,11 +114,35 @@ def show_graph(sensor_name, sensor_id):
         st.error(f"Network error for {sensor_name}")
         st.code(str(e))
 
-# --- Layout (2×2 grid) ---
+    return in_peak, out_peak
+
+
+# --- Display Sensors (2×2 Grid) + Collect Totals ---
+total_in = 0
+total_out = 0
 sensor_items = list(SENSORS.items())
+
 for i in range(0, len(sensor_items), 2):
     cols = st.columns(2)
     for col, (sensor_name, sensor_id) in zip(cols, sensor_items[i:i+2]):
         with col:
             st.subheader(f"{sensor_name} — {graph_period}")
-            show_graph(sensor_name, sensor_id)
+            in_peak, out_peak = show_graph(sensor_name, sensor_id)
+            total_in += in_peak
+            total_out += out_peak
+
+# --- Summary Chart for Total Bandwidth ---
+st.markdown("---")
+st.header("📈 Total Bandwidth Summary (All Sensors Combined)")
+
+st.markdown(
+    f"**Total Peak In:** {total_in:.2f} Mbps  **Total Peak Out:** {total_out:.2f} Mbps"
+)
+
+# --- Bar Chart Visualization ---
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out])
+ax.set_ylabel("Mbps")
+ax.set_title("Aggregate Peak Bandwidth Usage")
+ax.grid(axis="y", linestyle="--", alpha=0.6)
+st.pyplot(fig)
