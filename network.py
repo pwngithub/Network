@@ -1,68 +1,54 @@
-import streamlit as st
 import requests
-from PIL import Image
-from io import BytesIO
-from requests.auth import HTTPBasicAuth
+import xml.etree.ElementTree as ET
 
-# --- Page Configuration ---
-st.set_page_config(page_title="PRTG Graph Viewer", layout="wide")
-
-# --- PRTG Configuration ---
-PRTG_URL = "https://prtg.pioneerbroadband.net"
-SENSOR_ID = "12363"
-
-# --- Securely load credentials from Streamlit's secrets management ---
-try:
-    PRTG_USERNAME = st.secrets["prtg_username"]
-    PRTG_PASSHASH = st.secrets["prtg_passhash"]
-except KeyError:
-    st.error("PRTG credentials not found in Streamlit secrets. Please configure them.")
-    st.stop() # Stop the app if secrets are missing.
-
-# --- Streamlit App UI ---
-st.title("📊 PRTG Sensor Graph Viewer")
-st.write(f"Displaying graph for Sensor ID: **{SENSOR_ID}**")
-
-graph_period = st.selectbox(
-    "Select Graph Period",
-    ("Live (2 hours)", "Last 48 hours", "Last 30 days", "Last 365 days"),
+# --- Configuration ---
+# Replace these with your actual PRTG server details
+PRTG_SERVER_URL = "https://prtg.pioneerbroadband.net" # e.g., "https://prtg.mycompany.com"
+PRTG_USERNAME = "streamlit_api_userUser"
+PRTG_PASSHASH = "N4RWTIZ3WXZTKIJDO5L4QFQ5SJKECLJMTYCZW7HGHE======" # Get this from your user account settings in PRTG
+# --- Build the API Request URL ---
+# We are asking for a table of all sensors and requesting the 'sensor' column
+api_url = (
+    f"{PRTG_SERVER_URL}/api/table.xml?"
+    f"content=sensors&"
+    f"columns=sensor,objid&" # Ask for the sensor name and its object ID
+    f"username={PRTG_USERNAME}&"
+    f"passhash={PRTG_PASSHASH}"
 )
 
-period_to_graphid = {
-    "Live (2 hours)": "0",
-    "Last 48 hours": "1",
-    "Last 30 days": "2",
-    "Last 365 days": "3",
-}
-graphid = period_to_graphid[graph_period]
-
-# --- Fetch and Display Graph (Using Header Authentication) ---
-st.write("Attempting to fetch graph...")
-
-# Define the authentication credentials to be sent in the request header.
-auth = HTTPBasicAuth(PRTG_USERNAME, PRTG_PASSHASH)
-
-# Construct the URL WITHOUT the username and passhash.
-graph_url_base = (
-    f"{PRTG_URL}/chart.png?id={SENSOR_ID}&graphid={graphid}"
-    f"&width=1200&height=500"
-)
+print(f"Requesting data from: {PRTG_SERVER_URL}")
 
 try:
-    # Make the request using the 'auth' parameter.
-    response = requests.get(graph_url_base, auth=auth, verify=True, timeout=10)
+    # --- Make the HTTP GET Request ---
+    response = requests.get(api_url)
 
-    st.write(f"Response Status Code: {response.status_code}")
+    # --- Handle the Response ---
+    # Check the HTTP status code to see if the request was successful
+    if response.status_code == 200:
+        print("✅ Request successful! Processing XML data...")
 
-    if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-        prtg_graph = Image.open(BytesIO(response.content))
-        st.image(prtg_graph, caption=f"PRTG Graph - {graph_period}")
+        # Parse the XML response text
+        root = ET.fromstring(response.content)
+
+        # Find all <item> tags in the XML, which represent individual sensors
+        for item in root.findall('item'):
+            sensor_name = item.find('sensor').text
+            sensor_id = item.find('objid').text
+            print(f"  - Sensor Name: {sensor_name} (ID: {sensor_id})")
+
+    elif response.status_code == 401:
+        print("❌ Error: Authentication failed (401 Unauthorized).")
+        print("Please check your PRTG_USERNAME and PRTG_PASSHASH.")
+
+    elif response.status_code == 400:
+        print("❌ Error: Bad Request (400). The server could not process the request.")
+        # Try to parse the error message from the XML response
+        root = ET.fromstring(response.content)
+        error_message = root.find('error').text
+        print(f"Server error message: {error_message}")
+
     else:
-        st.error("Failed to get a valid image from PRTG. The server did not return an image.")
-        st.write("Server Response (first 500 characters):")
-        st.code(response.text[:500])
+        print(f"❌ An unexpected error occurred. HTTP Status Code: {response.status_code}")
 
 except requests.exceptions.RequestException as e:
-    st.error("A network error occurred while trying to connect to PRTG.")
-    st.info("This could mean Streamlit Cloud cannot access your server or the server is down.")
-    st.code(str(e))
+    print(f"❌ A network error occurred: {e}")
