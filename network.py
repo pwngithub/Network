@@ -4,8 +4,9 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
+from streamlit_autorefresh import st_autorefresh  # built-in helper
 
-# Disable SSL warnings for self-signed certs (safe internally)
+# Disable SSL warnings for self-signed certs (safe for internal use)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -24,24 +25,10 @@ except KeyError:
 st.title("📊 PRTG Bandwidth Overview")
 
 # --- Auto-refresh toggle ---
-enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds", value=False)
+enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
 if enable_refresh:
-    st.experimental_rerun  # placeholder to avoid linter
-    st_autorefresh = st.experimental_rerun  # placeholder, not used directly
-    st_autorefresh = st.experimental_rerun
-    st_autorefresh = st.experimental_rerun
-    st_autorefresh = st.experimental_rerun
-    st_autorefresh = st.experimental_rerun
-    st_autorefresh = st.experimental_rerun
-    st_autorefresh = st.experimental_rerun
-else:
-    pass
-
-# Use Streamlit's built-in auto-refresh (works every interval in ms)
-if enable_refresh:
-    st_autorefresh = st.experimental_rerun
-    st.experimental_rerun
-st_autorefresh = st.autorefresh(interval=60 * 1000) if enable_refresh else None
+    # Refresh every 60 seconds (60000 ms)
+    st_autorefresh(interval=60 * 1000, key="auto_refresh")
 
 # --- Sensors ---
 SENSORS = {
@@ -81,6 +68,7 @@ def fetch_bandwidth_stats(sensor_id):
                 name = ch.get("name", "")
                 max_val = ch.get("maximum_raw")
                 avg_val = ch.get("average_raw")
+
                 if max_val not in (None, "", " "):
                     try:
                         stats[f"{name}_max"] = round(float(max_val) / 1_000_000, 2)
