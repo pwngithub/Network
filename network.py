@@ -9,8 +9,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="PRTG Graph Viewer", layout="wide")
 
 PRTG_URL = "https://prtg.pioneerbroadband.net"
-SENSOR_ID = "12363"
 
+# --- Load Credentials ---
 try:
     PRTG_USERNAME = st.secrets["prtg_username"]
     PRTG_PASSHASH = st.secrets["prtg_passhash"]
@@ -18,7 +18,10 @@ except KeyError:
     st.error("Missing PRTG credentials in Streamlit secrets.")
     st.stop()
 
-st.title("📊 PRTG Sensor Graph Viewer")
+st.title("📊 PRTG Graph Viewer")
+
+# --- Simple Sensor Selection ---
+SENSOR_ID = st.text_input("Enter Sensor ID", "12363")
 
 graph_period = st.selectbox(
     "Select Graph Period",
@@ -35,18 +38,22 @@ graph_url = (
     f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
 )
 
-st.write("Fetching graph...")
-response = requests.get(graph_url, verify=False, timeout=10)
+if st.button("Load Graph"):
+    st.write(f"Fetching graph for Sensor ID: **{SENSOR_ID}** ...")
+    try:
+        response = requests.get(graph_url, verify=False, timeout=10)
+        st.write("Status:", response.status_code)
+        st.write("Content-Type:", response.headers.get("Content-Type", "N/A"))
 
-st.write("Status:", response.status_code)
-st.write("Content-Type:", response.headers.get("Content-Type", "N/A"))
-
-if response.status_code == 200:
-    if "image" in response.headers.get("Content-Type", ""):
-        img = Image.open(BytesIO(response.content))
-        st.image(img, caption=f"PRTG Graph - {graph_period}", use_container_width=True)
-    else:
-        st.error("PRTG returned HTML instead of an image (login or error page).")
-        st.code(response.text[:500])
-else:
-    st.error(f"Failed to load graph. HTTP {response.status_code}")
+        if response.status_code == 200:
+            if "image" in response.headers.get("Content-Type", ""):
+                img = Image.open(BytesIO(response.content))
+                st.image(img, caption=f"PRTG Graph - {graph_period}", use_container_width=True)
+            else:
+                st.error("PRTG returned HTML instead of an image (login or error page).")
+                st.code(response.text[:500])
+        else:
+            st.error(f"Failed to load graph. HTTP {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        st.error("Network error while contacting PRTG.")
+        st.code(str(e))
