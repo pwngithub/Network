@@ -5,7 +5,7 @@ from io import BytesIO
 import urllib3
 import matplotlib.pyplot as plt
 
-# Disable SSL warnings for self-signed certs (safe for internal use)
+# Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -25,27 +25,6 @@ st.title("📊 PRTG Bandwidth Overview")
 
 # --- Auto-refresh toggle ---
 enable_refresh = st.toggle("🔄 Auto-refresh every 60 seconds (Live only)", value=False)
-if enable_refresh:
-    st_autorefresh = st.experimental_rerun  # placeholder
-if enable_refresh:
-    if "refresh" not in st.session_state:
-        st.session_state["refresh"] = 0
-    # Only run refresh if period is "Live"
-    if st.session_state.get("graph_period") == "Live (2 hours)":
-        st.session_state["refresh"] += 1
-        st.experimental_rerun()
-
-# Use the built-in st.autorefresh (Streamlit v1.24+)
-if enable_refresh:
-    st_autorefresh = st.autorefresh(interval=60 * 1000, key="auto_refresh")
-
-# --- Sensors ---
-SENSORS = {
-    "Core Router - Houlton (ID 12435)": "12435",
-    "Core Router - Presque Isle (ID 12506)": "12506",
-    "Fiber Aggregation Switch (ID 12363)": "12363",
-    "DWDM Node - Calais (ID 12340)": "12340",
-}
 
 # --- Graph Period ---
 graph_period = st.selectbox(
@@ -59,6 +38,19 @@ period_to_graphid = {
     "Last 365 days": "3",
 }
 graphid = period_to_graphid[graph_period]
+
+# --- Auto-refresh logic ---
+if enable_refresh and graph_period == "Live (2 hours)":
+    st_autorefresh = st.experimental_rerun  # avoid linter warnings
+    st_autorefresh = st.autorefresh(interval=60 * 1000, key="auto_refresh")
+
+# --- Sensors ---
+SENSORS = {
+    "Core Router - Houlton (ID 12435)": "12435",
+    "Core Router - Presque Isle (ID 12506)": "12506",
+    "Fiber Aggregation Switch (ID 12363)": "12363",
+    "DWDM Node - Calais (ID 12340)": "12340",
+}
 
 # --- Fetch Peak/Average Stats ---
 def fetch_bandwidth_stats(sensor_id):
