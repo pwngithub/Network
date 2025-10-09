@@ -4,7 +4,6 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 
-# Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -20,7 +19,7 @@ except KeyError:
     st.error("Missing PRTG credentials in Streamlit secrets.")
     st.stop()
 
-st.title("📊 PRTG Sensor Graph Viewer")
+st.title("📊 PRTG Bandwidth Overview")
 
 # --- Sensors ---
 SENSORS = {
@@ -43,8 +42,38 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Graph Fetch Function ---
-def fetch_graph(sensor_name, sensor_id):
+# --- Function to fetch peak bandwidth from PRTG API ---
+def fetch_peak_bandwidth(sensor_id):
+    try:
+        url = (
+            f"{PRTG_URL}/api/table.json?"
+            f"content=channels&columns=name,lastvalue_,lastvalue_raw,maximum,maximum_raw"
+            f"&id={sensor_id}"
+            f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
+        )
+        response = requests.get(url, verify=False, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            peaks = {}
+            for ch in data.get("channels", []):
+                name = ch.get("name", "")
+                max_val = ch.get("maximum_raw")
+                if max_val is not None:
+                    # Convert from bits per second to Mbps
+                    peaks[name] = round(float(max_val) / 1_000_000, 2)
+            return peaks
+    except Exception as e:
+        st.warning(f"Error fetching peak bandwidth: {e}")
+    return {}
+
+# --- Function to fetch and display graph ---
+def show_graph(sensor_name, sensor_id):
+    peaks = fetch_peak_bandwidth(sensor_id)
+    if peaks:
+        in_bw = peaks.get("Traffic In", 0)
+        out_bw = peaks.get("Traffic Out", 0)
+        st.markdown(f"**Peak In:** {in_bw} Mbps  **Peak Out:** {out_bw} Mbps")
+
     graph_url = (
         f"{PRTG_URL}/chart.png"
         f"?id={sensor_id}&graphid={graphid}"
@@ -52,6 +81,7 @@ def fetch_graph(sensor_name, sensor_id):
         f"&avg=0&graphstyling=base"
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
+
     try:
         response = requests.get(graph_url, verify=False, timeout=10)
         if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
@@ -59,18 +89,16 @@ def fetch_graph(sensor_name, sensor_id):
             st.image(img, caption=f"{sensor_name}", use_container_width=False)
         else:
             st.warning(f"⚠️ Could not load graph for {sensor_name}.")
-            st.code(response.text[:300])
+            st.code(response.text[:200])
     except requests.exceptions.RequestException as e:
         st.error(f"Network error for {sensor_name}")
         st.code(str(e))
 
-# --- Display in 2x2 Grid ---
+# --- Layout (2x2 grid) ---
 sensor_items = list(SENSORS.items())
-
-# Use two columns for readability on wide screens
 for i in range(0, len(sensor_items), 2):
     cols = st.columns(2)
     for col, (sensor_name, sensor_id) in zip(cols, sensor_items[i:i+2]):
         with col:
             st.subheader(f"{sensor_name} — {graph_period}")
-            fetch_graph(sensor_name, sensor_id)
+            show_graph(sensor_name, sensor_id)
