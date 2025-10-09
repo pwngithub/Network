@@ -4,7 +4,7 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 
-# Disable SSL warnings for self-signed certs
+# Disable SSL warnings for self-signed certs (safe inside your network)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Page Setup ---
@@ -30,7 +30,7 @@ SENSORS = {
     "DWDM Node - Calais (ID 12340)": "12340",
 }
 
-# --- Graph Period ---
+# --- Graph Period Selector ---
 graph_period = st.selectbox(
     "Select Graph Period",
     ("Live (2 hours)", "Last 48 hours", "Last 30 days", "Last 365 days"),
@@ -43,26 +43,31 @@ period_to_graphid = {
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Display All Graphs ---
-for sensor_name, sensor_id in SENSORS.items():
-    st.subheader(f"{sensor_name} — {graph_period}")
+# --- Create 2x2 Grid Layout ---
+sensor_items = list(SENSORS.items())
 
-    graph_url = (
-        f"{PRTG_URL}/chart.png"
-        f"?id={sensor_id}&graphid={graphid}"
-        f"&width=1200&height=500"
-        f"&avg=0&graphstyling=base"
-        f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
-    )
+# Split into two rows of two columns each
+for i in range(0, len(sensor_items), 2):
+    cols = st.columns(2)
+    for col, (sensor_name, sensor_id) in zip(cols, sensor_items[i:i+2]):
+        with col:
+            st.subheader(f"{sensor_name} — {graph_period}")
+            graph_url = (
+                f"{PRTG_URL}/chart.png"
+                f"?id={sensor_id}&graphid={graphid}"
+                f"&width=1200&height=500"
+                f"&avg=0&graphstyling=base"
+                f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
+            )
 
-    try:
-        response = requests.get(graph_url, verify=False, timeout=10)
-        if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
-            img = Image.open(BytesIO(response.content))
-            st.image(img, caption=f"{sensor_name}", use_container_width=True)
-        else:
-            st.warning(f"⚠️ Could not load graph for {sensor_name}.")
-            st.code(response.text[:500])
-    except requests.exceptions.RequestException as e:
-        st.error(f"Network error for {sensor_name}")
-        st.code(str(e))
+            try:
+                response = requests.get(graph_url, verify=False, timeout=10)
+                if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
+                    img = Image.open(BytesIO(response.content))
+                    st.image(img, caption=f"{sensor_name}", use_container_width=True)
+                else:
+                    st.warning(f"⚠️ Could not load graph for {sensor_name}.")
+                    st.code(response.text[:300])
+            except requests.exceptions.RequestException as e:
+                st.error(f"Network error for {sensor_name}")
+                st.code(str(e))
