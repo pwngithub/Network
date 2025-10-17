@@ -3,7 +3,6 @@ import requests
 from PIL import Image
 from io import BytesIO
 import urllib3
-import matplotlib.pyplot as plt
 
 # Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -21,7 +20,7 @@ except KeyError:
     st.error("Missing PRTG credentials in Streamlit secrets.")
     st.stop()
 
-st.title("📊 PRTG Bandwidth Overview (Gbps)")
+st.title("📊 PRTG Bandwidth Overview")
 
 # --- Graph Period ---
 graph_period = st.selectbox(
@@ -30,13 +29,13 @@ graph_period = st.selectbox(
 )
 period_to_graphid = {
     "Live (2 hours)": "0",
-    "Last 48 hours": "1",
+    "Last 48 hours)": "1",
     "Last 30 days": "2",
     "Last 365 days": "3",
 }
 graphid = period_to_graphid[graph_period]
 
-# --- Sensors (Renamed) ---
+# --- Sensors ---
 SENSORS = {
     "Firstlight (ID 12435)": "12435",
     "NNINIX (ID 12506)": "12506",
@@ -44,13 +43,14 @@ SENSORS = {
     "Cogent (ID 12340)": "12340",
 }
 
-# --- Fetch Peak/Average Stats ---
+# --- Fetch Formatted Stats ---
 def fetch_bandwidth_stats(sensor_id):
-    """Fetches channel data (in Bytes/sec) and calculates bandwidth in Gbps."""
+    """Fetches the pre-formatted channel data directly from PRTG, including units."""
     try:
+        # Request the 'maximum' and 'average' fields which include the units as a string
         url = (
             f"{PRTG_URL}/api/table.json?"
-            f"content=channels&columns=name,maximum_raw,average_raw"
+            f"content=channels&columns=name,maximum,average"
             f"&id={sensor_id}"
             f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
         )
@@ -59,27 +59,10 @@ def fetch_bandwidth_stats(sensor_id):
             data = response.json()
             stats = {}
             for ch in data.get("channels", []):
-                name = ch.get("name", "")
-                max_val = ch.get("maximum_raw")
-                avg_val = ch.get("average_raw")
-
-                # CORRECTED: PRTG raw traffic values are typically in Bytes per second.
-                # 1. Multiply by 8 to get bits per second (bps).
-                # 2. Divide by 1,000,000,000 to get Gigabits per second (Gbps).
-                if max_val not in (None, "", " "):
-                    try:
-                        bits_per_sec = float(max_val) * 8
-                        gbps = bits_per_sec / 1_000_000_000
-                        stats[f"{name}_max"] = round(gbps, 2)
-                    except (ValueError, TypeError):
-                        pass
-                if avg_val not in (None, "", " "):
-                    try:
-                        bits_per_sec = float(avg_val) * 8
-                        gbps = bits_per_sec / 1_000_000_000
-                        stats[f"{name}_avg"] = round(gbps, 2)
-                    except (ValueError, TypeError):
-                        pass
+                name = ch.get("name", "Unknown Channel")
+                # Get the formatted string (e.g., "9.73 Gbit/s")
+                stats[f"{name}_max"] = ch.get("maximum", "N/A")
+                stats[f"{name}_avg"] = ch.get("average", "N/A")
             return stats
     except Exception as e:
         st.warning(f"Error fetching bandwidth data for sensor {sensor_id}: {e}")
@@ -87,16 +70,17 @@ def fetch_bandwidth_stats(sensor_id):
 
 # --- Fetch and Display Graph ---
 def show_graph(sensor_name, sensor_id):
-    """Displays bandwidth stats and the corresponding graph for a sensor."""
+    """Displays the formatted bandwidth stats and the graph for a sensor."""
     stats = fetch_bandwidth_stats(sensor_id)
-    in_peak = stats.get("Traffic In_max", 0)
-    out_peak = stats.get("Traffic Out_max", 0)
-    in_avg = stats.get("Traffic In_avg", 0)
-    out_avg = stats.get("Traffic Out_avg", 0)
+    in_peak = stats.get("Traffic In_max", "N/A")
+    out_peak = stats.get("Traffic Out_max", "N/A")
+    in_avg = stats.get("Traffic In_avg", "N/A")
+    out_avg = stats.get("Traffic Out_avg", "N/A")
 
+    # Display the pre-formatted values directly
     st.markdown(
-        f"**Peak In:** {in_peak} Gbps  **Peak Out:** {out_peak} Gbps  \n"
-        f"**Avg In:** {in_avg} Gbps  **Avg Out:** {out_avg} Gbps"
+        f"**Peak In:** {in_peak}  **Peak Out:** {out_peak}  \n"
+        f"**Avg In:** {in_avg}  **Avg Out:** {out_avg}"
     )
 
     graph_url = (
@@ -104,7 +88,6 @@ def show_graph(sensor_name, sensor_id):
         f"?id={sensor_id}&graphid={graphid}"
         f"&width=1600&height=700"
         f"&avg=0&graphstyling=base"
-        f"&useunit=gbit"
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
 
@@ -119,34 +102,14 @@ def show_graph(sensor_name, sensor_id):
     except requests.exceptions.RequestException as e:
         st.error(f"Network error for {sensor_name}")
         st.code(str(e))
-    return in_peak, out_peak
 
-# --- Display Sensors (2x2 Grid) + Collect Totals ---
-total_in = 0
-total_out = 0
+# --- Display Sensors (2×2 Grid) ---
 sensor_items = list(SENSORS.items())
 
 for i in range(0, len(sensor_items), 2):
     cols = st.columns(2)
     for col, (sensor_name, sensor_id) in zip(cols, sensor_items[i:i+2]):
-        with col:
-            st.subheader(f"{sensor_name} — {graph_period}")
-            in_peak, out_peak = show_graph(sensor_name, sensor_id)
-            total_in += in_peak
-            total_out += out_peak
-
-# --- Summary Chart for Total Bandwidth ---
-st.markdown("---")
-st.header("📈 Total Bandwidth Summary (All Sensors Combined)")
-
-st.markdown(
-    f"**Total Peak In:** {total_in:.2f} Gbps  **Total Peak Out:** {total_out:.2f} Gbps"
-)
-
-fig, ax = plt.subplots(figsize=(7, 4))
-ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out],
-       color=["#1f77b4", "#ff7f0e"])
-ax.set_ylabel("Gbps")
-ax.set_title("Aggregate Peak Bandwidth")
-ax.grid(axis="y", linestyle="--", alpha=0.6)
-st.pyplot(fig)
+        if sensor_name: # Check if there is a sensor to display
+            with col:
+                st.subheader(f"{sensor_name} — {graph_period}")
+                show_graph(sensor_name, sensor_id)
