@@ -46,7 +46,7 @@ SENSORS = {
 
 # --- Fetch Peak/Average Stats ---
 def fetch_bandwidth_stats(sensor_id):
-    """Fetches channel data (in Mbps) and calculates peak/average bandwidth in Gbps."""
+    """Fetches channel data (in bps) and calculates peak/average bandwidth in Gbps."""
     try:
         url = (
             f"{PRTG_URL}/api/table.json?"
@@ -63,15 +63,16 @@ def fetch_bandwidth_stats(sensor_id):
                 max_val = ch.get("maximum_raw")
                 avg_val = ch.get("average_raw")
 
-                # CORRECTED: Convert Mbps value to Gbps by dividing by 1,000
+                # CORRECTED: PRTG raw traffic values are in bits per second (bps).
+                # Convert bps to Gbps by dividing by 1,000,000,000.
                 if max_val not in (None, "", " "):
                     try:
-                        stats[f"{name}_max"] = round(float(max_val) / 1000, 2)
+                        stats[f"{name}_max"] = round(float(max_val) / 1_000_000_000, 2)
                     except ValueError:
                         pass
                 if avg_val not in (None, "", " "):
                     try:
-                        stats[f"{name}_avg"] = round(float(avg_val) / 1000, 2)
+                        stats[f"{name}_avg"] = round(float(avg_val) / 1_000_000_000, 2)
                     except ValueError:
                         pass
             return stats
@@ -144,5 +145,3 @@ ax.set_ylabel("Gbps")
 ax.set_title("Aggregate Peak Bandwidth")
 ax.grid(axis="y", linestyle="--", alpha=0.6)
 st.pyplot(fig)
-
-
