@@ -46,7 +46,7 @@ SENSORS = {
 
 # --- Fetch Peak/Average Stats ---
 def fetch_bandwidth_stats(sensor_id):
-    """Fetches channel data (in bps) and calculates peak/average bandwidth in Gbps."""
+    """Fetches channel data (in Bytes/sec) and calculates bandwidth in Gbps."""
     try:
         url = (
             f"{PRTG_URL}/api/table.json?"
@@ -63,17 +63,22 @@ def fetch_bandwidth_stats(sensor_id):
                 max_val = ch.get("maximum_raw")
                 avg_val = ch.get("average_raw")
 
-                # CORRECTED: PRTG raw traffic values are in bits per second (bps).
-                # Convert bps to Gbps by dividing by 1,000,000,000.
+                # CORRECTED: PRTG raw traffic values are typically in Bytes per second.
+                # 1. Multiply by 8 to get bits per second (bps).
+                # 2. Divide by 1,000,000,000 to get Gigabits per second (Gbps).
                 if max_val not in (None, "", " "):
                     try:
-                        stats[f"{name}_max"] = round(float(max_val) / 1_000_000_000, 2)
-                    except ValueError:
+                        bits_per_sec = float(max_val) * 8
+                        gbps = bits_per_sec / 1_000_000_000
+                        stats[f"{name}_max"] = round(gbps, 2)
+                    except (ValueError, TypeError):
                         pass
                 if avg_val not in (None, "", " "):
                     try:
-                        stats[f"{name}_avg"] = round(float(avg_val) / 1_000_000_000, 2)
-                    except ValueError:
+                        bits_per_sec = float(avg_val) * 8
+                        gbps = bits_per_sec / 1_000_000_000
+                        stats[f"{name}_avg"] = round(gbps, 2)
+                    except (ValueError, TypeError):
                         pass
             return stats
     except Exception as e:
@@ -99,7 +104,7 @@ def show_graph(sensor_name, sensor_id):
         f"?id={sensor_id}&graphid={graphid}"
         f"&width=1600&height=700"
         f"&avg=0&graphstyling=base"
-        f"&useunit=gbit"  # Force Y-axis to Gigabits
+        f"&useunit=gbit"
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
 
