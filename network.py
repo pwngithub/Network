@@ -9,7 +9,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="PRTG Graph Viewer", layout="wide")
 
-# ---------- dark-mode toggle ----------
 dark = st.checkbox("🌙 Dark mode")
 if dark:
     st.markdown(
@@ -22,7 +21,6 @@ if dark:
         unsafe_allow_html=True,
     )
 
-# ---------- secrets ----------
 PRTG_URL = "https://prtg.pioneerbroadband.net"
 try:
     PRTG_USERNAME = st.secrets["prtg_username"]
@@ -31,7 +29,6 @@ except KeyError:
     st.error("Missing PRTG credentials in Streamlit secrets.")
     st.stop()
 
-# ---------- title ----------
 st.markdown(
     f"""
     <style>
@@ -45,7 +42,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- period selector ----------
 period_col, _ = st.columns([1, 3])
 with period_col:
     graph_period = st.radio(
@@ -56,7 +52,6 @@ with period_col:
     )
 graphid = {"Live (2 h)": "0", "48 h": "1", "30 d": "2", "365 d": "3"}[graph_period]
 
-# ---------- sensors ----------
 SENSORS = {
     "Firstlight (ID 12435)": "12435",
     "NNINIX (ID 12506)": "12506",
@@ -116,18 +111,20 @@ def show_graph(sensor_name, sensor_id):
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
 
-    # ---------- WORKING IMAGE BLOCK ----------
+    # ---------- diagnostic image block ----------
     response = requests.get(graph_url, verify=False, timeout=10)
-    if response.status_code == 200 and response.headers.get("Content-Type", "").startswith("image"):
+    st.write("HTTP status:", response.status_code)
+    st.write("Content-Type:", response.headers.get("Content-Type", "missing"))
+    st.write("First 30 bytes raw:", response.content[:30])
+    if response.headers.get("Content-Type", "").startswith("image"):
         img = Image.open(BytesIO(response.content))
-        st.image(img, use_container_width=True)   # ← new API
+        st.image(img, use_container_width=True)
     else:
-        st.warning(f"Graph not returned as PNG for {sensor_name}")
-    # -----------------------------------------
+        st.code(response.text[:400])
+    # ------------------------------------------
 
     return in_peak, out_peak
 
-# ---------- display ----------
 total_in, total_out = 0, 0
 sensor_items = list(SENSORS.items())
 
@@ -155,4 +152,3 @@ if st.button("⬆  Back to top"):
         '<script>window.scrollTo({top:0,behavior:"smooth"});</script>',
         unsafe_allow_html=True,
     )
-
