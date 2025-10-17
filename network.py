@@ -124,7 +124,7 @@ def show_graph(sensor_name, sensor_id):
         response = requests.get(graph_url, verify=False, timeout=10)
         if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
             img = Image.open(BytesIO(response.content))
-            st.image(img, use_column_width=True)
+            st.image(img, use_container_width=True)          # ← updated parameter
         else:
             st.warning(f"⚠️ Could not load graph for {sensor_name}.")
     except requests.exceptions.RequestException as e:
@@ -162,4 +162,3 @@ if st.button("⬆  Back to top"):
         '<script>window.scrollTo({top:0,behavior:"smooth"});</script>',
         unsafe_allow_html=True,
     )
-
