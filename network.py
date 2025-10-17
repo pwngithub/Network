@@ -5,13 +5,10 @@ from io import BytesIO
 import urllib3
 import datetime
 
-# Disable SSL warnings for self-signed certs (safe internally)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ---------- page ----------
 st.set_page_config(page_title="PRTG Graph Viewer", layout="wide")
 
-# ---------- css dark-mode ----------
 dark = st.checkbox("🌙 Dark mode")
 if dark:
     st.markdown(
@@ -24,7 +21,6 @@ if dark:
         unsafe_allow_html=True,
     )
 
-# ---------- secrets ----------
 PRTG_URL = "https://prtg.pioneerbroadband.net"
 try:
     PRTG_USERNAME = st.secrets["prtg_username"]
@@ -33,7 +29,6 @@ except KeyError:
     st.error("Missing PRTG credentials in Streamlit secrets.")
     st.stop()
 
-# ---------- title + last-update chip ----------
 st.markdown(
     f"""
     <style>
@@ -47,7 +42,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- period selector (horizontal) ----------
 period_col, _ = st.columns([1, 3])
 with period_col:
     graph_period = st.radio(
@@ -58,7 +52,6 @@ with period_col:
     )
 graphid = {"Live (2 h)": "0", "48 h": "1", "30 d": "2", "365 d": "3"}[graph_period]
 
-# ---------- sensor list ----------
 SENSORS = {
     "Firstlight (ID 12435)": "12435",
     "NNINIX (ID 12506)": "12506",
@@ -66,7 +59,6 @@ SENSORS = {
     "Cogent (ID 12340)": "12340",
 }
 
-# ---------- helpers ----------
 def fetch_bandwidth_stats(sensor_id):
     try:
         url = (
@@ -105,7 +97,6 @@ def show_graph(sensor_name, sensor_id):
     in_avg = stats.get("Traffic In_avg", 0)
     out_avg = stats.get("Traffic Out_avg", 0)
 
-    # --- metric pills ---
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     kpi1.metric("Peak In", f"{in_peak} Mbps")
     kpi2.metric("Peak Out", f"{out_peak} Mbps")
@@ -120,19 +111,23 @@ def show_graph(sensor_name, sensor_id):
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
 
+    # --------------------------------------------------
+    # TEMPORARY DEBUG BLOCK
+    # --------------------------------------------------
     try:
         response = requests.get(graph_url, verify=False, timeout=10)
-        if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
-            img = Image.open(BytesIO(response.content))
-            st.image(img, use_container_width=True)          # ← updated parameter
-        else:
-            st.warning(f"⚠️ Could not load graph for {sensor_name}.")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Network error for {sensor_name}")
-        st.code(str(e))
+        st.write("HTTP status:", response.status_code)
+        st.write("Content-Type:", response.headers.get("Content-Type"))
+        st.write("First 200 bytes:", response.content[:200])
+        img = Image.open(BytesIO(response.content))
+        st.image(img, use_container_width=True)
+    except Exception as e:
+        st.error("Cannot open as image – probably an HTML error page:")
+        st.code(response.text[:500])
+    # --------------------------------------------------
+
     return in_peak, out_peak
 
-# ---------- display sensors (2×2 grid) ----------
 total_in, total_out = 0, 0
 sensor_items = list(SENSORS.items())
 
@@ -147,7 +142,6 @@ for i in range(0, len(sensor_items), 2):
                 total_in += in_peak
                 total_out += out_peak
 
-# ---------- aggregate summary ----------
 st.markdown("---")
 st.header("📈  Aggregate Peak")
 agg_col1, agg_col2, agg_col3 = st.columns([1, 2, 1])
@@ -155,10 +149,10 @@ with agg_col2:
     st.metric("Total Peak In", f"{total_in:.1f} Mbps")
     st.metric("Total Peak Out", f"{total_out:.1f} Mbps")
 
-# ---------- back-to-top ----------
 st.markdown('<div id="top"></div>', unsafe_allow_html=True)
 if st.button("⬆  Back to top"):
     st.markdown(
         '<script>window.scrollTo({top:0,behavior:"smooth"});</script>',
         unsafe_allow_html=True,
     )
+
