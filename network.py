@@ -46,7 +46,7 @@ SENSORS = {
 
 # --- Fetch Peak/Average Stats ---
 def fetch_bandwidth_stats(sensor_id):
-    """Fetches channel data and calculates peak/average bandwidth in Gbps."""
+    """Fetches channel data (in Mbps) and calculates peak/average bandwidth in Gbps."""
     try:
         url = (
             f"{PRTG_URL}/api/table.json?"
@@ -63,15 +63,15 @@ def fetch_bandwidth_stats(sensor_id):
                 max_val = ch.get("maximum_raw")
                 avg_val = ch.get("average_raw")
 
-                # Convert raw bps value to Gbps by dividing by 1 billion
+                # CORRECTED: Convert Mbps value to Gbps by dividing by 1,000
                 if max_val not in (None, "", " "):
                     try:
-                        stats[f"{name}_max"] = round(float(max_val) / 1_000_000_000, 2)
+                        stats[f"{name}_max"] = round(float(max_val) / 1000, 2)
                     except ValueError:
                         pass
                 if avg_val not in (None, "", " "):
                     try:
-                        stats[f"{name}_avg"] = round(float(avg_val) / 1_000_000_000, 2)
+                        stats[f"{name}_avg"] = round(float(avg_val) / 1000, 2)
                     except ValueError:
                         pass
             return stats
@@ -88,13 +88,11 @@ def show_graph(sensor_name, sensor_id):
     in_avg = stats.get("Traffic In_avg", 0)
     out_avg = stats.get("Traffic Out_avg", 0)
 
-    # Display stats with "Gbps" unit
     st.markdown(
         f"**Peak In:** {in_peak} Gbps  **Peak Out:** {out_peak} Gbps  \n"
         f"**Avg In:** {in_avg} Gbps  **Avg Out:** {out_avg} Gbps"
     )
 
-    # Add 'useunit=gbit' to force the graph image's Y-axis to Gbps
     graph_url = (
         f"{PRTG_URL}/chart.png"
         f"?id={sensor_id}&graphid={graphid}"
@@ -135,15 +133,16 @@ for i in range(0, len(sensor_items), 2):
 st.markdown("---")
 st.header("📈 Total Bandwidth Summary (All Sensors Combined)")
 
-# Display total stats with "Gbps" unit
 st.markdown(
     f"**Total Peak In:** {total_in:.2f} Gbps  **Total Peak Out:** {total_out:.2f} Gbps"
 )
 
 fig, ax = plt.subplots(figsize=(7, 4))
 ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out],
-       color=["#1f77b4", "#ff7f0e"]) # Using default blue/orange colors
-ax.set_ylabel("Gbps") # Update Y-axis label
+       color=["#1f77b4", "#ff7f0e"])
+ax.set_ylabel("Gbps")
 ax.set_title("Aggregate Peak Bandwidth")
 ax.grid(axis="y", linestyle="--", alpha=0.6)
 st.pyplot(fig)
+
+
