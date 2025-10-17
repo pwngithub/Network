@@ -4,11 +4,13 @@ from PIL import Image
 from io import BytesIO
 import urllib3
 import datetime
+import matplotlib.pyplot as plt
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="PRTG Graph Viewer", layout="wide")
 
+# ---------- dark-mode toggle ----------
 dark = st.checkbox("🌙 Dark mode")
 if dark:
     st.markdown(
@@ -29,6 +31,7 @@ except KeyError:
     st.error("Missing PRTG credentials in Streamlit secrets.")
     st.stop()
 
+# ---------- title / last-update chip ----------
 st.markdown(
     f"""
     <style>
@@ -42,15 +45,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---------- horizontal period selector ----------
 period_col, _ = st.columns([1, 3])
 with period_col:
     graph_period = st.radio(
         "📊  Period",
-        ["Live (2 h)", "48 h", "30 d", "365 d"],
+        ["Live (2 hours)", "Last 48 hours", "Last 30 days", "Last 365 days"],
         horizontal=True,
         label_visibility="collapsed",
     )
-graphid = {"Live (2 h)": "0", "48 h": "1", "30 d": "2", "365 d": "3"}[graph_period]
+period_to_graphid = {
+    "Live (2 hours)": "0",
+    "Last 48 hours": "1",
+    "Last 30 days": "2",
+    "Last 365 days": "3",
+}
+graphid = period_to_graphid[graph_period]
 
 SENSORS = {
     "Firstlight (ID 12435)": "12435",
@@ -59,6 +69,7 @@ SENSORS = {
     "Cogent (ID 12340)": "12340",
 }
 
+# ---------- unchanged helpers ----------
 def fetch_bandwidth_stats(sensor_id):
     try:
         url = (
@@ -90,6 +101,7 @@ def fetch_bandwidth_stats(sensor_id):
         st.warning(f"Error fetching bandwidth data for sensor {sensor_id}: {e}")
     return {}
 
+# ---------- show_graph with ORIGINAL image code ----------
 def show_graph(sensor_name, sensor_id):
     stats = fetch_bandwidth_stats(sensor_id)
     in_peak = stats.get("Traffic In_max", 0)
@@ -97,6 +109,7 @@ def show_graph(sensor_name, sensor_id):
     in_avg = stats.get("Traffic In_avg", 0)
     out_avg = stats.get("Traffic Out_avg", 0)
 
+    # NEW: metric pills instead of markdown
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     kpi1.metric("Peak In", f"{in_peak} Mbps")
     kpi2.metric("Peak Out", f"{out_peak} Mbps")
@@ -111,14 +124,23 @@ def show_graph(sensor_name, sensor_id):
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
 
-    # ---------- WORKING IMAGE BLOCK ----------
-    response = requests.get(graph_url, verify=False, timeout=10)
-    img = Image.open(BytesIO(response.content))
-    st.image(img, use_container_width=True)   # ← correct param
-    # ------------------------------------------
+    # ---------- ORIGINAL IMAGE BLOCK  (only param fixed) ----------
+    try:
+        response = requests.get(graph_url, verify=False, timeout=10)
+        if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
+            img = Image.open(BytesIO(response.content))
+            st.image(img, use_container_width=True)   # ← fixed param
+            st.markdown("<hr style='border:1px solid #ccc; margin:20px 0;'>", unsafe_allow_html=True)
+        else:
+            st.warning(f"⚠️ Could not load graph for {sensor_name}.")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Network error for {sensor_name}")
+        st.code(str(e))
+    # -------------------------------------------------------
 
     return in_peak, out_peak
 
+# ---------- 2×2 sensor grid ----------
 total_in, total_out = 0, 0
 sensor_items = list(SENSORS.items())
 
@@ -127,22 +149,30 @@ for i in range(0, len(sensor_items), 2):
     for col, (sensor_name, sensor_id) in zip(cols, sensor_items[i : i + 2]):
         with col:
             with st.container():
-                st.subheader(sensor_name)
-                st.caption(graph_period)
+                st.subheader(f"{sensor_name} — {graph_period}")
                 in_peak, out_peak = show_graph(sensor_name, sensor_id)
                 total_in += in_peak
                 total_out += out_peak
 
+# ---------- aggregate summary ----------
 st.markdown("---")
-st.header("📈  Aggregate Peak")
-agg_col1, agg_col2, agg_col3 = st.columns([1, 2, 1])
-with agg_col2:
-    st.metric("Total Peak In", f"{total_in:.1f} Mbps")
-    st.metric("Total Peak Out", f"{total_out:.1f} Mbps")
+st.header("📈 Total Bandwidth Summary (All Sensors Combined)")
+st.markdown(
+    f"**Total Peak In:** {total_in:.2f} Mbps  **Total Peak Out:** {total_out:.2f} Mbps"
+)
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.bar(["Total Peak In", "Total Peak Out"], [total_in, total_out],
+       color=["tab:blue", "tab:orange"])
+ax.set_ylabel("Mbps")
+ax.set_title("Aggregate Peak Bandwidth (Current)")
+ax.grid(axis="y", linestyle="--", alpha=0.6)
+st.pyplot(fig)
 
+# ---------- back-to-top ----------
 st.markdown('<div id="top"></div>', unsafe_allow_html=True)
 if st.button("⬆  Back to top"):
     st.markdown(
         '<script>window.scrollTo({top:0,behavior:"smooth"});</script>',
         unsafe_allow_html=True,
     )
+
