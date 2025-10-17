@@ -111,16 +111,10 @@ def show_graph(sensor_name, sensor_id):
         f"&username={PRTG_USERNAME}&passhash={PRTG_PASSHASH}"
     )
 
-    # ---------- diagnostic image block ----------
+    # ---------- WORKING IMAGE BLOCK ----------
     response = requests.get(graph_url, verify=False, timeout=10)
-    st.write("HTTP status:", response.status_code)
-    st.write("Content-Type:", response.headers.get("Content-Type", "missing"))
-    st.write("First 30 bytes raw:", response.content[:30])
-    if response.headers.get("Content-Type", "").startswith("image"):
-        img = Image.open(BytesIO(response.content))
-        st.image(img, use_container_width=True)
-    else:
-        st.code(response.text[:400])
+    img = Image.open(BytesIO(response.content))
+    st.image(img, use_container_width=True)   # ← correct param
     # ------------------------------------------
 
     return in_peak, out_peak
